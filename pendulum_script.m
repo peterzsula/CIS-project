@@ -30,8 +30,8 @@ m.J = m.m*m.l^2;
 Ts = 0.02; 
 
 %% Actuator limits 
-umin = -100;
-umax = 100;
+umin = -2;
+umax = 2;
 
 %% Linear model
 %%%%%% Here you should set the matrices Ac and Bc which correspond to
