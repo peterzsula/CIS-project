@@ -1,0 +1,17 @@
+# Simulink / MATLAB build and cache files (regenerated on every run)
+slprj/
+*.slxc
+*.mexw64
+*.mexa64
+*.mexmaci64
+codegen/
+sccprj/
+
+# Autosave / backup files
+*.asv
+*.autosave
+*.slx.r20*
+*.bak
+
+# Course notes (not project work)
+CIS_course_notes*.pdf
