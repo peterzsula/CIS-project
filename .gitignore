@@ -15,3 +15,6 @@ sccprj/
 
 # Course notes (not project work)
 CIS_course_notes*.pdf
+
+# macOS Finder metadata
+.DS_Store
