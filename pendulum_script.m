@@ -31,7 +31,7 @@ Ts = 0.02;
 
 %% Actuator limits 
 umin = -2.5;
-umax = 2.5;
+u_max = 2.5;
 
 %% Linear model
 %%%%%% Here you should set the matrices Ac and Bc which correspond to
