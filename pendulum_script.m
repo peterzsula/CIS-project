@@ -31,7 +31,7 @@ Ts = 0.02;
 
 %% Actuator limits 
 umin = -2.5;
-u_max = 2.5;
+umax = 2.5;
 
 %% Linear model
 %%%%%% Here you should set the matrices Ac and Bc which correspond to
@@ -54,7 +54,7 @@ Bd = sysd.B;
 %% R = 1;
 th_max = deg2rad(180);  w_max = 2;
 Q = diag([1/th_max^2, 1/w_max^2]);
-R = 1/u_max^2;
+R = 1/umax^2;
 K = dlqr(Ad,Bd,Q,R,0);
 
 %% Observer
