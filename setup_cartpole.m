@@ -1,6 +1,6 @@
 %% Cart-pole swing-up and upright stabilization
 % Run this script from any working directory.  The Simulink MATLAB Function
-% block uses the same capture thresholds listed below.
+% block receives the capture thresholds below through the capture parameter.
 projectFolder = fileparts(mfilename('fullpath'));
 addpath(projectFolder);
 
@@ -90,6 +90,7 @@ captureP = 0.60;
 captureV = 1.50;
 captureTheta = deg2rad(20);
 captureOmega = 0.75;
+capture = [captureP, captureV, captureTheta, captureOmega];  % passed to the Simulink controller
 thetaNomWrapped = atan2(sin(Xnom(3,:)),cos(Xnom(3,:)));
 terminalInCapture = abs(Xnom(1,end)) <= captureP && ...
     abs(Xnom(2,end)) <= captureV && ...
