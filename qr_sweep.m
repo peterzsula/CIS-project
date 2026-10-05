@@ -1,83 +1,67 @@
-%% Q/R sweep for the LQR controller, starting from hanging down (180 deg)
-% Run pendulum_script.m once first (it defines p, m, g, Ts, Ad, Bd, C, umin, umax).
-% The torque limits from pendulum_script are kept, because the swing-up depends on them.
-% The observer block must contain the angle wrapping.
-%
-% Metrics (on the wrapped angle, so 360 deg counts as upright):
-%   success      ends within 2 deg of upright and stays there for the last 2 s
-%   t_reach      first time |theta| < 10 deg (arrives near the top)
-%   t_settle     last time |theta| > 2 deg
-%   turns        full revolutions made before settling (spinning)
-%   final        final angle (shows the tilted saturated equilibrium if it gets stuck)
-%   effort       integral of u^2
-%   sat %        share of time the torque was at its limit
+%% Q/R sweep for the LQR controller (Part 1, "Choosing Q and R")
+% The weights are parametrized with Bryson's rule,
+%   Q = diag(1/th_max^2, 1/w_max^2),  R = 1/u_max^2,
+% and each case changes one of the three limits of the nominal design.
+% Two tests per case:
+%   release   start at rest at 35 deg        -> settling time, control effort, max control
+%   kick      start upright with 100 deg/s   -> max angular displacement, max control
+pendulum_setup
+mdl = 'actuated_pendulum';
 
-%% Fixed test conditions, so only Q and R differ between runs
-p.theta0 = 180;                       % deg, hanging down
-xhat0 = [0; 0];       % perfect initial estimate: no lucky observer kick
-L = place(Ad', C', [0.6 0.65])';      % fixed observer, so it does not change with K
+%% Cases: [th_max (deg), w_max (rad/s), u_max (N m)], first row is the nominal design
+nom = [rad2deg(th_max), w_max, 1/sqrt(R)];
+cases = [nom
+         60      nom(2)  nom(3)      % larger angle weight
+         20      nom(2)  nom(3)
+         nom(1)  8       nom(3)      % smaller velocity weight
+         nom(1)  0.5     nom(3)      % larger velocity weight
+         nom(1)  nom(2)  0.5         % expensive control
+         nom(1)  nom(2)  12.5];      % cheap control
 
-% Switch off both noise sources (restored at the end).
-% The block requires Minimum < Maximum, so use a negligibly small range instead of 0.
-load_system('actuated_pendulum');     % find_system only searches loaded models
-rnd = find_system('actuated_pendulum', 'BlockType', 'UniformRandomNumber');
-oldMin = get_param(rnd, 'Minimum');  oldMax = get_param(rnd, 'Maximum');
-for i = 1:numel(rnd), set_param(rnd{i}, 'Minimum', '-1e-12', 'Maximum', '1e-12'); end
-
-%% Cases: {Q, R, label}
-th_max = deg2rad(180);  w_max = 2;  u_max = umax;         % Bryson's rule (notes eq. 43-44)
-cases = {
-    eye(2),                          1,           'baseline Q=I, R=1'
-    eye(2),                          0.1,         'cheap control R=0.1'
-    eye(2),                          10,          'expensive control R=10'
-    diag([10 1]),                    1,           'angle weight q1=10'
-    diag([1 10]),                    1,           'velocity weight q2=10'
-    diag([1/th_max^2, 1/w_max^2]),   1/u_max^2,   'Bryson (10 deg, 2 rad/s, umax)'
-};
+%% Conditions common to all runs
+use_observer = false;          % controller uses the measured state
+u_noise = 0;  y_noise = 0;     % no noise
+umin = -inf;  umax = inf;      % no saturation
+xhat0 = [0; 0];                % observer runs in parallel, not used for control
 
 %% Run
-wrap = @(a) mod(a + pi, 2*pi) - pi;
-res = struct();
-figure;  ax1 = subplot(2,1,1); hold on;  ax2 = subplot(2,1,2); hold on;
-for c = 1:size(cases,1)
-    [K, ~, P] = dlqr(Ad, Bd, cases{c,1}, cases{c,2});
-    out = sim("actuated_pendulum");
+fprintf('\n%29s | %25s | %16s\n', '', 'release from 35 deg', 'kick 100 deg/s');
+fprintf('%6s %5s %5s %12s | %8s %7s %7s | %8s %7s\n', 'th_max', 'w_max', 'u_max', 'K', ...
+        't_settle', 'effort', 'max|u|', 'max|th|', 'max|u|');
+figure('Position', [100 100 900 600]);
+ax = gobjects(2, 2);  for i = 1:4, ax(i) = subplot(2, 2, i);  hold(ax(i), 'on');  grid(ax(i), 'on');  end
+ax = ax';                                    % ax(row, col): rows theta/u, cols release/kick
+for c = cases'
+    K = dlqr(Ad, Bd, diag([1/deg2rad(c(1))^2, 1/c(2)^2]), 1/c(3)^2);
+    p.theta0 = 35;  p.omega0 = 0;    rel  = run_case(mdl);
+    p.theta0 = 0;   p.omega0 = 100;  kick = run_case(mdl);
+    fprintf('%6g %5g %5g [%4.2f %4.2f] | %8.2f %7.2f %7.2f | %8.1f %7.2f\n', c, K, ...
+            rel.t_settle, rel.effort, rel.umax, kick.thmax, kick.umax);
 
-    t  = out.theta_sim.Time;  th = squeeze(out.theta_sim.Data);  thw = wrap(th);
-    tu = out.u_sim.Time;      u  = squeeze(out.u_sim.Data);
-
-    ok = abs(thw) < deg2rad(2);
-    res(c).label   = cases{c,3};
-    res(c).K       = K;
-    res(c).success = all(ok(t > t(end) - 2));
-    i_reach = find(abs(thw) < deg2rad(10), 1, 'first');
-    res(c).t_reach = NaN;  if ~isempty(i_reach), res(c).t_reach = t(i_reach); end
-    i_last  = find(~ok, 1, 'last');
-    res(c).t_settle = NaN; if res(c).success, res(c).t_settle = t(min(i_last+1, numel(t))); end
-    res(c).turns   = round((th(end) - th(1)) / (2*pi));
-    res(c).final   = rad2deg(thw(end));
-    res(c).effort  = trapz(tu, u.^2);
-    res(c).umax    = max(abs(u));
-    res(c).sat     = 100 * mean(abs(u) >= 0.999*max(abs([umin umax])));
-
-    plot(ax1, t, rad2deg(thw), 'DisplayName', cases{c,3});
-    stairs(ax2, tu, u, 'DisplayName', cases{c,3});
+    lw = 0.75 + 1.25*isequal(c', nom);       % nominal design drawn thicker
+    name = sprintf('%g deg, %g rad/s, %g N m', c);
+    plot(ax(1,1), rel.t, rel.th, 'LineWidth', lw, 'DisplayName', name);
+    stairs(ax(2,1), rel.tu, rel.u, 'LineWidth', lw);
+    plot(ax(1,2), kick.t, kick.th, 'LineWidth', lw);
+    stairs(ax(2,2), kick.tu, kick.u, 'LineWidth', lw);
 end
+title(ax(1,1), 'Release from 35 deg');  title(ax(1,2), 'Kick 100 deg/s');
+ylabel(ax(1,1), '\theta [deg]');  ylabel(ax(2,1), 'u [N m]');
+xlabel(ax(2,1), 't [s]');  xlabel(ax(2,2), 't [s]');
+set(ax(:,1), 'XLim', [0 3]);  set(ax(:,2), 'XLim', [0 1.5]);
+legend(ax(1,1), 'Location', 'northeast');
+exportgraphics(gcf, 'qr_sweep.png', 'Resolution', 200);
 
-% Restore noise settings
-for i = 1:numel(rnd), set_param(rnd{i}, 'Minimum', oldMin{i}, 'Maximum', oldMax{i}); end
-
-ylabel(ax1, '\theta wrapped [deg]'); ylim(ax1, [-190 190]); yticks(ax1, -180:90:180);
-legend(ax1, 'Location', 'best'); grid(ax1, 'on');
-ylabel(ax2, 'u [N m]'); xlabel(ax2, 't [s]'); grid(ax2, 'on');
-title(ax1, sprintf('Start at %d deg, |u| <= %.2f N m', p.theta0, umax));
-
-%% Table
-fprintf('\nStart %d deg, torque limit [%.2f, %.2f] N m\n', p.theta0, umin, umax);
-fprintf('%-32s %16s %4s %8s %9s %6s %8s %8s %7s\n', 'case', 'K', 'ok', ...
-        't_reach', 't_settle', 'turns', 'final', 'effort', 'sat %');
-for c = 1:numel(res)
-    fprintf('%-32s [%6.2f %6.2f] %4d %8.2f %9.2f %6d %8.1f %8.2f %7.1f\n', res(c).label, ...
-        res(c).K, res(c).success, res(c).t_reach, res(c).t_settle, res(c).turns, ...
-        res(c).final, res(c).effort, res(c).sat);
+function r = run_case(mdl)
+% Simulate 10 s and compute the metrics. Angles in deg.
+%   t_settle   last time |theta| > 1 deg (NaN if it has not settled by the end)
+%   effort     integral of u^2
+    out = sim(mdl, 'StopTime', '10');
+    t = out.theta_sim.Time;  th = rad2deg(squeeze(out.theta_sim.Data));
+    u = squeeze(out.u_sim.Data);
+    r.t_settle = max([0; t(abs(th) > 1)]);  if abs(th(end)) > 1, r.t_settle = NaN; end
+    r.thmax  = max(abs(th));
+    r.effort = trapz(out.u_sim.Time, u.^2);
+    r.umax   = max(abs(u));
+    r.t = t;  r.th = th;  r.tu = out.u_sim.Time;  r.u = u;
 end
