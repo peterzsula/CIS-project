@@ -18,3 +18,19 @@ CIS_course_notes*.pdf
 
 # macOS Finder metadata
 .DS_Store
+
+# Generated experiment figures and local validation artifacts
+/full_system.png
+/lqr_evaluation.png
+/qr_sweep.png
+/sampling_time.png
+/actuator_limits.png
+/observer_poles.png
+/measurement_noise.png
+/input_disturbance.png
+/model_uncertainty.png
+/alternative_estimation.png
+/simscape_vs_ode.png
+/open_loop.png
+/output/
+/backups/

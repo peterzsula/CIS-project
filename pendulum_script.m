@@ -1,15 +1,6 @@
 %% Full control system: LQR on the observer estimate, with disturbances
-pendulum_setup                     % plant, model, discretization, LQR, observer
-
-%% Conditions of this run
-p.theta0 = 180;        % deg, initial angle
-p.omega0 = 0;          % deg/s, initial angular velocity
-xhat0 = [0; 0];        % initial state estimate: "I don't know where it starts"
-% xhat0 = [deg2rad(p.theta0); deg2rad(p.omega0)];   % perfect initial guess, for comparison
-use_observer = true;   % controller uses the observer estimate (false: the measured state)
-u_noise = 0.005;       % N*m, amplitude of the uniform disturbance on the plant input
-y_noise = 0.005;       % rad, amplitude of the uniform noise on the angle measurement
-% torque limits: nominal umin, umax from pendulum_setup
+projectFolder = fileparts(mfilename('fullpath'));
+run(fullfile(projectFolder,'initialize_pendulum.m')); % complete baseline setup
 
 %% Simulate the actuated pendulum
 %%% The following command runs the simulation.
@@ -17,6 +8,7 @@ y_noise = 0.005;       % rad, amplitude of the uniform noise on the angle measur
 %%% contains the outputs from the simulation (for example, measured and
 %%% estimated values, control input, or any other thing you add)
 
+load_system(fullfile(projectFolder,'actuated_pendulum.slx'));
 out = sim("actuated_pendulum", 'StopTime', '10');
 
 %% Result

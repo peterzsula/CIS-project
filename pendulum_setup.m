@@ -3,6 +3,12 @@
 % conditions and runs no simulation: each experiment script calls this first and
 % then states its own conditions (initial state, state source, noise, limits).
 
+projectFolder = fileparts(mfilename('fullpath'));
+addpath(projectFolder);
+clear cis_active_model;
+p = struct();
+m = struct();  % Part 2 uses m as a scalar; restore the Part 1 structure.
+
 %% Physical parameters 
 %%%%% These are the parameters used by the Simulink model and they
 %%%%% correspond to the properties of the real physical system
@@ -73,3 +79,6 @@ obs_poles = p_slow.^[k_obs, 1.5*k_obs];   % two distinct real poles
 
 % 3) Gain via duality: place works on A - B K, so transpose
 L = place(Ad', C', obs_poles)';    % L is 2x1
+
+% Experiment scripts add their own initial state and noise conditions next.
+cis_active_model = 'actuated_pendulum';
