@@ -72,13 +72,13 @@ N = round(T/Ts);
 T = N*Ts;
 tGuess = (0:N-1)*Ts;
 
-% Seed with a bounded 1.3 Hz swing-up waveform whose open-loop rollout
-% approaches the selected capture region for these physical parameters.
-swingupFrequency = 1.30;
-U0 = Fmax*sin(2*pi*swingupFrequency*tGuess + 3*pi/2);
+U0 = zeros(1,N);   % zero initial guess
 
-Q = diag([1/xmax^2, 1/vScale^2, 1/thetaScale^2, 1/omegaScale^2]);
-R = R_lqr;
+% Small running cost: the pole is far from upright for most of the swing-up,
+% so the path is left nearly free and Qf alone pulls the end state into the
+% capture zone.  R = 1/5^2 keeps the force moderate.
+Q = 0.001*Q_lqr;
+R = 0.04;
 % Give the terminal velocity and cart state stronger weight so the LQR can
 % take over with the chosen force limit.
 Qf = diag([200, 20, 30/deg2rad(10)^2, 100]);
